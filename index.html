@@ -2,67 +2,114 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
-<title>LionX TRON Token Scanner V3</title>
+<title>LionX TRON Scanner V4</title>
 
 <style>
+* {
+  box-sizing: border-box;
+}
+
 body {
+  margin: 0;
+  padding: 20px;
   background: #07111f;
   color: white;
   font-family: Arial, sans-serif;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+}
+
+header {
   text-align: center;
-  padding: 20px;
+  padding: 25px 10px;
 }
 
 h1 {
   color: #00ffcc;
 }
 
-.container {
+.subtitle {
+  color: #aabbcc;
+}
+
+.card {
   background: #142438;
-  padding: 20px;
-  border-radius: 15px;
-  max-width: 500px;
-  margin: 30px auto;
+  padding: 22px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #28435b;
 }
 
 input {
-  width: 90%;
-  padding: 14px;
-  border-radius: 8px;
+  width: 100%;
+  padding: 15px;
   border: none;
-  margin: 10px 0;
-  font-size: 14px;
+  border-radius: 9px;
+  font-size: 15px;
+  margin: 12px 0;
 }
 
 button {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 9px;
   background: #00ffcc;
   color: #07111f;
-  padding: 14px 25px;
-  border: none;
-  border-radius: 8px;
   font-weight: bold;
+  font-size: 16px;
   cursor: pointer;
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-#result {
-  margin-top: 20px;
-  text-align: left;
+.info {
+  padding: 12px;
+  background: #0b1b2b;
+  border-radius: 8px;
+  margin: 10px 0;
   overflow-wrap: anywhere;
-  line-height: 1.8;
+}
+
+.label {
+  color: #91a9bd;
+  font-size: 13px;
+}
+
+.value {
+  margin-top: 6px;
+  font-weight: bold;
+}
+
+.warning {
+  color: #ffcc66;
+}
+
+.success {
+  color: #00ffcc;
 }
 
 .error {
   color: #ff7777;
 }
 
-.success {
+a {
   color: #00ffcc;
+}
+
+footer {
+  text-align: center;
+  color: #91a9bd;
+  padding: 20px;
+  font-size: 13px;
 }
 </style>
 </head>
@@ -71,23 +118,61 @@ button:disabled {
 
 <div class="container">
 
-<h1>🦁 TRON Token Scanner V3</h1>
+<header>
+<h1>🦁 LionX Scanner V4</h1>
+<p class="subtitle">
+TRON Token Research Dashboard
+</p>
+</header>
 
-<p>Research TRON TRC-20 Tokens</p>
+<div class="card">
+
+<h2>🔍 Research TRC-20 Token</h2>
+
+<p>
+Enter a TRON token contract address.
+</p>
 
 <input
-  type="text"
-  id="address"
-  placeholder="Enter TRON token contract address"
+id="address"
+placeholder="TRON contract address"
+autocomplete="off"
 >
-
-<br>
 
 <button id="scanBtn" onclick="scanToken()">
 Research Token
 </button>
 
-<div id="result"></div>
+<p id="status"></p>
+
+</div>
+
+<div id="results" hidden>
+
+<div class="card">
+<h2>🪙 Token Information</h2>
+<div id="tokenInfo"></div>
+</div>
+
+<div class="card">
+<h2>🛡️ Security Research</h2>
+<div id="securityInfo"></div>
+</div>
+
+<div class="card">
+<h2>🔗 Blockchain Explorer</h2>
+<div id="explorerInfo"></div>
+</div>
+
+</div>
+
+<footer>
+LionX Marketplace © 2026
+<br>
+Blockchain Research Tools
+<br><br>
+Research only. Not financial advice.
+</footer>
 
 </div>
 
@@ -98,15 +183,40 @@ const API = "https://api.trongrid.io";
 const OWNER =
 "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
-const result = document.getElementById("result");
+const statusBox =
+document.getElementById("status");
+
+const results =
+document.getElementById("results");
+
+function setStatus(message, className = "") {
+  statusBox.textContent = message;
+  statusBox.className = className;
+}
+
+function addInfo(container, label, value) {
+  const box = document.createElement("div");
+  box.className = "info";
+
+  const title = document.createElement("div");
+  title.className = "label";
+  title.textContent = label;
+
+  const content = document.createElement("div");
+  content.className = "value";
+  content.textContent = String(value);
+
+  box.appendChild(title);
+  box.appendChild(content);
+  container.appendChild(box);
+}
 
 function decodeString(hex) {
-  if (!hex) return "Unknown";
+  if (!hex) return "Unavailable";
 
   try {
     let data = hex;
 
-    // Handle ABI dynamic strings
     if (hex.length >= 128) {
       const offset = Number(
         BigInt("0x" + hex.slice(0, 64))
@@ -114,7 +224,10 @@ function decodeString(hex) {
 
       if (offset + 64 <= hex.length) {
         const length = Number(
-          BigInt("0x" + hex.slice(offset, offset + 64))
+          BigInt(
+            "0x" +
+            hex.slice(offset, offset + 64)
+          )
         );
 
         data = hex.slice(
@@ -125,57 +238,100 @@ function decodeString(hex) {
     }
 
     const bytes = new Uint8Array(
-      (data.match(/.{1,2}/g) || [])
-        .map(x => parseInt(x, 16))
+      (data.match(/.{2}/g) || [])
+      .map(x => parseInt(x, 16))
     );
 
     return new TextDecoder()
       .decode(bytes)
       .replace(/\0/g, "")
-      .trim() || "Unknown";
+      .trim() || "Unavailable";
 
-  } catch (e) {
-    return "Unknown";
+  } catch {
+    return "Unavailable";
   }
+}
+
+async function postAPI(path, body) {
+  const response = await fetch(API + path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      "TRON API returned " + response.status
+    );
+  }
+
+  return response.json();
 }
 
 async function callContract(address, method) {
 
-  const response = await fetch(
-    API + "/wallet/triggerconstantcontract",
+  const data = await postAPI(
+    "/wallet/triggerconstantcontract",
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        owner_address: OWNER,
-        contract_address: address,
-        function_selector: method,
-        parameter: "",
-        visible: true
-      })
+      owner_address: OWNER,
+      contract_address: address,
+      function_selector: method,
+      parameter: "",
+      visible: true
     }
   );
-
-  if (!response.ok) {
-    throw new Error(
-      "TRON API error: " + response.status
-    );
-  }
-
-  const data = await response.json();
 
   if (
     data.result?.result === false ||
     !data.constant_result?.[0]
   ) {
     throw new Error(
-      "Contract call failed: " + method
+      "Cannot read " + method
     );
   }
 
   return data.constant_result[0];
+}
+
+async function getContract(address) {
+  return postAPI("/wallet/getcontract", {
+    value: address,
+    visible: true
+  });
+}
+
+function formatSupply(raw, decimals) {
+  if (raw === null || decimals === null) {
+    return "Unavailable";
+  }
+
+  if (
+    !Number.isInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 255
+  ) {
+    return "Unavailable";
+  }
+
+  const value = raw.toString();
+
+  if (decimals === 0) return value;
+
+  const padded = value.padStart(
+    decimals + 1, "0"
+  );
+
+  const whole = padded.slice(0, -decimals);
+
+  const fraction = padded
+    .slice(-decimals)
+    .replace(/0+$/, "");
+
+  return fraction
+    ? whole + "." + fraction
+    : whole;
 }
 
 async function scanToken() {
@@ -184,128 +340,219 @@ async function scanToken() {
     .getElementById("address")
     .value.trim();
 
-  const button = document
-    .getElementById("scanBtn");
+  const button =
+    document.getElementById("scanBtn");
 
-  if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) {
-    result.innerHTML =
-      '<p class="error">Enter a valid TRON address.</p>';
+  const tokenInfo =
+    document.getElementById("tokenInfo");
+
+  const securityInfo =
+    document.getElementById("securityInfo");
+
+  const explorerInfo =
+    document.getElementById("explorerInfo");
+
+  results.hidden = true;
+
+  tokenInfo.replaceChildren();
+  securityInfo.replaceChildren();
+  explorerInfo.replaceChildren();
+
+  if (
+    !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)
+  ) {
+    setStatus(
+      "❌ Enter a TRON-format address.",
+      "error"
+    );
     return;
   }
 
   button.disabled = true;
-  result.textContent = "🔍 Researching token...";
+
+  setStatus("🔍 Researching token...");
 
   try {
 
-    const calls = await Promise.allSettled([
-      callContract(address, "name()"),
-      callContract(address, "symbol()"),
-      callContract(address, "decimals()"),
-      callContract(address, "totalSupply()")
-    ]);
+    const methods = [
+      "name()",
+      "symbol()",
+      "decimals()",
+      "totalSupply()"
+    ];
 
-    if (calls.every(x => x.status === "rejected")) {
-      throw new Error(
-        "Unable to read token contract. Check the address."
-      );
-    }
-
-    function getValue(index) {
-      return calls[index].status === "fulfilled"
-        ? calls[index].value
-        : null;
-    }
-
-    const nameHex = getValue(0);
-    const symbolHex = getValue(1);
-    const decimalsHex = getValue(2);
-    const supplyHex = getValue(3);
-
-    const name = nameHex
-      ? decodeString(nameHex)
-      : "Unavailable";
-
-    const symbol = symbolHex
-      ? decodeString(symbolHex)
-      : "Unavailable";
-
-    const decimals = decimalsHex
-      ? Number(BigInt("0x" + decimalsHex))
-      : null;
-
-    const supply = supplyHex
-      ? BigInt("0x" + supplyHex)
-      : null;
-
-    let formattedSupply = "Unavailable";
-
-    if (
-      supply !== null &&
-      decimals !== null &&
-      Number.isInteger(decimals) &&
-      decimals >= 0 &&
-      decimals <= 255
-    ) {
-      const raw = supply.toString().padStart(
-        decimals + 1, "0"
-      );
-
-      if (decimals === 0) {
-        formattedSupply = raw;
-      } else {
-        const whole = raw.slice(0, -decimals);
-        const fraction = raw
-          .slice(-decimals)
-          .replace(/0+$/, "");
-
-        formattedSupply = fraction
-          ? whole + "." + fraction
-          : whole;
-      }
-    }
-
-    result.innerHTML = "";
-
-    function show(label, value) {
-      const p = document.createElement("p");
-      const strong = document.createElement("strong");
-
-      strong.textContent = label + ": ";
-      p.appendChild(strong);
-      p.appendChild(
-        document.createTextNode(String(value))
-      );
-
-      result.appendChild(p);
-    }
-
-    const heading = document.createElement("h3");
-    heading.className = "success";
-    heading.textContent = "🦁 Token Research Results";
-    result.appendChild(heading);
-
-    show("Token Name", name);
-    show("Symbol", symbol);
-    show("Decimals",
-      decimals === null ? "Unavailable" : decimals
+    const calls = await Promise.allSettled(
+      methods.map(method =>
+        callContract(address, method)
+      )
     );
-    show("Total Supply", formattedSupply);
-    show("Contract Address", address);
 
-    const note = document.createElement("p");
-    note.textContent =
-      "⚠️ Token information is not a security audit. " +
-      "Always research contracts before interacting.";
+    const contractCheck =
+      await Promise.allSettled([
+        getContract(address)
+      ]);
 
-    result.appendChild(note);
+    const values = calls.map(item =>
+      item.status === "fulfilled"
+        ? item.value
+        : null
+    );
+
+    if (values.every(v => v === null)) {
+      throw new Error(
+        "Unable to read TRC-20 token data."
+      );
+    }
+
+    const name = values[0]
+      ? decodeString(values[0])
+      : "Unavailable";
+
+    const symbol = values[1]
+      ? decodeString(values[1])
+      : "Unavailable";
+
+    let decimals = null;
+    let supply = null;
+
+    try {
+      if (values[2]) {
+        const d = BigInt("0x" + values[2]);
+        if (d <= 255n) {
+          decimals = Number(d);
+        }
+      }
+    } catch {}
+
+    try {
+      if (values[3]) {
+        supply = BigInt("0x" + values[3]);
+      }
+    } catch {}
+
+    addInfo(tokenInfo, "Token Name", name);
+    addInfo(tokenInfo, "Symbol", symbol);
+
+    addInfo(
+      tokenInfo,
+      "Decimals",
+      decimals === null
+        ? "Unavailable"
+        : decimals
+    );
+
+    addInfo(
+      tokenInfo,
+      "Total Supply",
+      formatSupply(supply, decimals)
+    );
+
+    addInfo(
+      tokenInfo,
+      "Contract Address",
+      address
+    );
+
+    const contractResult =
+      contractCheck[0];
+
+    const contractData =
+      contractResult.status === "fulfilled"
+        ? contractResult.value
+        : null;
+
+    const contractFound = Boolean(
+      contractData &&
+      contractData.contract_address &&
+      contractData.bytecode
+    );
+
+    addInfo(
+      securityInfo,
+      "Contract Detection",
+      contractFound
+        ? "Contract data returned"
+        : "Not confirmed"
+    );
+
+    const successfulCalls =
+      calls.filter(
+        item => item.status === "fulfilled"
+      ).length;
+
+    addInfo(
+      securityInfo,
+      "TRC-20 Metadata Checks",
+      successfulCalls + " of 4 successful"
+    );
+
+    addInfo(
+      securityInfo,
+      "Ownership Permissions",
+      "Not assessed"
+    );
+
+    addInfo(
+      securityInfo,
+      "Minting and Blacklist Controls",
+      "Not assessed"
+    );
+
+    addInfo(
+      securityInfo,
+      "Liquidity and Holder Concentration",
+      "Not assessed"
+    );
+
+    addInfo(
+      securityInfo,
+      "Security Conclusion",
+      "Insufficient evidence for a safety rating"
+    );
+
+    const warning =
+      document.createElement("p");
+
+    warning.className = "warning";
+
+    warning.textContent =
+      "⚠️ Successful metadata checks do not " +
+      "prove a token is safe. This scanner " +
+      "does not perform a contract audit.";
+
+    securityInfo.appendChild(warning);
+
+    const explorerLink =
+      document.createElement("a");
+
+    explorerLink.href =
+      "https://tronscan.org/#/contract/" +
+      encodeURIComponent(address);
+
+    explorerLink.target = "_blank";
+
+    explorerLink.rel =
+      "noopener noreferrer";
+
+    explorerLink.textContent =
+      "🔗 View contract on TRONSCAN";
+
+    explorerInfo.appendChild(explorerLink);
+
+    results.hidden = false;
+
+    setStatus(
+      "✅ Research completed. Review all warnings.",
+      "success"
+    );
 
   } catch (error) {
 
-    result.textContent =
-      "❌ " + error.message;
-
-    result.className = "error";
+    setStatus(
+      "❌ " + error.message +
+      " Check the address and try again.",
+      "error"
+    );
 
   } finally {
 
