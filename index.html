@@ -3,45 +3,127 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TRON Token Scanner</title>
+<title>TRON Blockchain Scanner</title>
 <style>
-body{background:#0b1020;color:white;font-family:Arial,sans-serif;text-align:center;padding:30px 15px}
-main{background:#18223a;border-radius:16px;padding:25px;max-width:450px;margin:40px auto}
-h1{color:#25e6b8}
-input,button{box-sizing:border-box;width:100%;padding:15px;margin-top:15px;border-radius:9px;font-size:16px}
-input{background:#0b1020;color:white;border:1px solid #25e6b8}
-button{background:#25e6b8;border:0;font-weight:bold}
-#result{margin-top:20px;overflow-wrap:anywhere}
+*{box-sizing:border-box}
+body{
+ background:#0b1020;
+ color:white;
+ font-family:Arial,sans-serif;
+ padding:25px 12px;
+ text-align:center;
+}
+main{
+ background:#18223a;
+ padding:24px;
+ border-radius:18px;
+ max-width:480px;
+ margin:35px auto;
+}
+h1{color:#25e6b8;font-size:26px}
+input,button{
+ width:100%;
+ padding:15px;
+ margin-top:14px;
+ border-radius:9px;
+ font-size:15px;
+}
+input{
+ background:#0b1020;
+ color:white;
+ border:1px solid #25e6b8;
+}
+button{
+ background:#25e6b8;
+ color:#07151c;
+ border:0;
+ font-weight:bold;
+ cursor:pointer;
+}
+button:disabled{opacity:.6}
+#result{
+ margin-top:22px;
+ text-align:left;
+ line-height:1.8;
+ overflow-wrap:anywhere;
+}
 a{color:#25e6b8}
 small{color:#aab5c8}
 </style>
 </head>
 <body>
 <main>
-<h1>🛡️ TRON Token Scanner</h1>
-<p>Enter a TRON address to research it</p>
-<input id="address" placeholder="TRON address">
-<button onclick="scan()">Scan Address</button>
-<div id="result"></div>
-<p><small>Address lookup only. Not a security audit or AI analysis.</small></p>
+<h1>🛡️ TRON Blockchain Scanner</h1>
+<p>Check real TRON blockchain account data</p>
+<input id="address" placeholder="Enter TRON address">
+<button id="scan" onclick="scan()">Scan Address</button>
+<div id="result" aria-live="polite"></div>
+<p><small>Blockchain information only. Not an AI security audit or investment advice.</small></p>
 </main>
 <script>
-function scan(){
-const address=document.getElementById("address").value.trim();
-const result=document.getElementById("result");
-result.replaceChildren();
-if(!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)){
-result.textContent="Please enter a valid-looking TRON address.";
-return;
-}
-const p=document.createElement("p");
-p.textContent="Address format looks correct. This does not confirm token safety.";
-const link=document.createElement("a");
-link.href="https://tronscan.org/#/address/"+encodeURIComponent(address);
-link.target="_blank";
-link.rel="noopener noreferrer";
-link.textContent="View blockchain details on TRONSCAN";
-result.append(p,link);
+async function scan(){
+ const address=document.getElementById("address").value.trim();
+ const result=document.getElementById("result");
+ const button=document.getElementById("scan");
+ result.replaceChildren();
+
+ if(!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)){
+  result.textContent="Enter a valid-looking TRON address.";
+  return;
+ }
+
+ button.disabled=true;
+ result.textContent="Loading blockchain data...";
+
+ try{
+  const url="https://api.trongrid.io/v1/accounts/"+encodeURIComponent(address);
+  const response=await fetch(url);
+  if(!response.ok) throw new Error("API error "+response.status);
+
+  const json=await response.json();
+  if(json.success===false) throw new Error("API request unsuccessful");
+
+  result.replaceChildren();
+  const account=json.data?.[0];
+
+  function show(label,value){
+   const p=document.createElement("p");
+   const strong=document.createElement("strong");
+   strong.textContent=label+": ";
+   p.append(strong,document.createTextNode(String(value)));
+   result.appendChild(p);
+  }
+
+  show("Address",address);
+
+  if(account){
+   show("TRX balance",account.balance==null
+    ? "Unavailable"
+    : (Number(account.balance)/1000000).toLocaleString()+" TRX");
+   show("Account created",account.create_time
+    ? new Date(account.create_time).toLocaleString()
+    : "Unknown");
+   show("Account type",account.account_type??"Unknown");
+  }else{
+   show("Account data","No account record returned");
+  }
+
+  show("Security assessment","Not performed");
+
+  const p=document.createElement("p");
+  const link=document.createElement("a");
+  link.href="https://tronscan.org/#/address/"+encodeURIComponent(address);
+  link.target="_blank";
+  link.rel="noopener noreferrer";
+  link.textContent="View on TRONSCAN";
+  p.appendChild(link);
+  result.appendChild(p);
+
+ }catch(error){
+  result.textContent="Could not load blockchain data. The API may be unavailable or rate-limited. Try again later.";
+ }finally{
+  button.disabled=false;
+ }
 }
 </script>
 </body>
