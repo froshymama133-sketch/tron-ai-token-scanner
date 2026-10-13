@@ -2,95 +2,319 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TRON Token Scanner V3</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>LionX TRON Token Scanner V3</title>
+
 <style>
-body{
-background:#0b1020;
-color:white;
-font-family:Arial,sans-serif;
-text-align:center;
-padding:20px 10px;
+body {
+  background: #07111f;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
 }
-main{
-background:#18223a;
-border-radius:16px;
-padding:25px 15px;
-max-width:480px;
-margin:30px auto;
+
+h1 {
+  color: #00ffcc;
 }
-h1{color:#25e6b8}
-input,button{
-box-sizing:border-box;
-width:100%;
-padding:15px;
-margin-top:15px;
-border-radius:9px;
-font-size:16px;
+
+.container {
+  background: #142438;
+  padding: 20px;
+  border-radius: 15px;
+  max-width: 500px;
+  margin: 30px auto;
 }
-input{
-background:#0b1020;
-color:white;
-border:1px solid #25e6b8;
+
+input {
+  width: 90%;
+  padding: 14px;
+  border-radius: 8px;
+  border: none;
+  margin: 10px 0;
+  font-size: 14px;
 }
-button{
-background:#25e6b8;
-border:0;
-font-weight:bold;
-cursor:pointer;
+
+button {
+  background: #00ffcc;
+  color: #07111f;
+  padding: 14px 25px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
 }
-button:disabled{opacity:.5}
-#result{
-margin-top:20px;
-text-align:left;
-overflow-wrap:anywhere;
-line-height:1.8;
+
+button:disabled {
+  opacity: 0.6;
 }
-a{color:#25e6b8}
-small{color:#aab5c8}
+
+#result {
+  margin-top: 20px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+
+.error {
+  color: #ff7777;
+}
+
+.success {
+  color: #00ffcc;
+}
 </style>
 </head>
-<body>
-<main>
-<h1>🛡️ TRON Token Scanner V3</h1>
-<p>Research TRON TRC-20 tokens</p>
 
-<input id="address"
-placeholder="Enter TRON token contract address">
+<body>
+
+<div class="container">
+
+<h1>🦁 TRON Token Scanner V3</h1>
+
+<p>Research TRON TRC-20 Tokens</p>
+
+<input
+  type="text"
+  id="address"
+  placeholder="Enter TRON token contract address"
+>
+
+<br>
 
 <button id="scanBtn" onclick="scanToken()">
-Scan Token
+Research Token
 </button>
 
-<div id="result" aria-live="polite"></div>
+<div id="result"></div>
 
-<p><small>
-Token information only.
-Not a security audit or investment advice.
-</small></p>
-</main>
+</div>
 
 <script>
-const result=document.getElementById("result");
-const button=document.getElementById("scanBtn");
 
-function show(label,value){
-const p=document.createElement("p");
-const b=document.createElement("strong");
-b.textContent=label+": ";
-p.append(b,document.createTextNode(String(value)));
-result.appendChild(p);
+const API = "https://api.trongrid.io";
+
+const OWNER =
+"TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+const result = document.getElementById("result");
+
+function decodeString(hex) {
+  if (!hex) return "Unknown";
+
+  try {
+    let data = hex;
+
+    // Handle ABI dynamic strings
+    if (hex.length >= 128) {
+      const offset = Number(
+        BigInt("0x" + hex.slice(0, 64))
+      ) * 2;
+
+      if (offset + 64 <= hex.length) {
+        const length = Number(
+          BigInt("0x" + hex.slice(offset, offset + 64))
+        );
+
+        data = hex.slice(
+          offset + 64,
+          offset + 64 + length * 2
+        );
+      }
+    }
+
+    const bytes = new Uint8Array(
+      (data.match(/.{1,2}/g) || [])
+        .map(x => parseInt(x, 16))
+    );
+
+    return new TextDecoder()
+      .decode(bytes)
+      .replace(/\0/g, "")
+      .trim() || "Unknown";
+
+  } catch (e) {
+    return "Unknown";
+  }
 }
 
-function decodeHex(hex){
-if(!/^[0-9a-f]*$/i.test(hex))return "";
-try{
-const bytes=new Uint8Array(
-hex.match(/.{2}/g).map(x=>parseInt(x,16))
-);
-return new TextDecoder().decode(bytes);
-}catch{return ""}
+async function callContract(address, method) {
+
+  const response = await fetch(
+    API + "/wallet/triggerconstantcontract",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        owner_address: OWNER,
+        contract_address: address,
+        function_selector: method,
+        parameter: "",
+        visible: true
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "TRON API error: " + response.status
+    );
+  }
+
+  const data = await response.json();
+
+  if (
+    data.result?.result === false ||
+    !data.constant_result?.[0]
+  ) {
+    throw new Error(
+      "Contract call failed: " + method
+    );
+  }
+
+  return data.constant_result[0];
 }
 
-function decodeString(hex){
-const
+async function scanToken() {
+
+  const address = document
+    .getElementById("address")
+    .value.trim();
+
+  const button = document
+    .getElementById("scanBtn");
+
+  if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) {
+    result.innerHTML =
+      '<p class="error">Enter a valid TRON address.</p>';
+    return;
+  }
+
+  button.disabled = true;
+  result.textContent = "🔍 Researching token...";
+
+  try {
+
+    const calls = await Promise.allSettled([
+      callContract(address, "name()"),
+      callContract(address, "symbol()"),
+      callContract(address, "decimals()"),
+      callContract(address, "totalSupply()")
+    ]);
+
+    if (calls.every(x => x.status === "rejected")) {
+      throw new Error(
+        "Unable to read token contract. Check the address."
+      );
+    }
+
+    function getValue(index) {
+      return calls[index].status === "fulfilled"
+        ? calls[index].value
+        : null;
+    }
+
+    const nameHex = getValue(0);
+    const symbolHex = getValue(1);
+    const decimalsHex = getValue(2);
+    const supplyHex = getValue(3);
+
+    const name = nameHex
+      ? decodeString(nameHex)
+      : "Unavailable";
+
+    const symbol = symbolHex
+      ? decodeString(symbolHex)
+      : "Unavailable";
+
+    const decimals = decimalsHex
+      ? Number(BigInt("0x" + decimalsHex))
+      : null;
+
+    const supply = supplyHex
+      ? BigInt("0x" + supplyHex)
+      : null;
+
+    let formattedSupply = "Unavailable";
+
+    if (
+      supply !== null &&
+      decimals !== null &&
+      Number.isInteger(decimals) &&
+      decimals >= 0 &&
+      decimals <= 255
+    ) {
+      const raw = supply.toString().padStart(
+        decimals + 1, "0"
+      );
+
+      if (decimals === 0) {
+        formattedSupply = raw;
+      } else {
+        const whole = raw.slice(0, -decimals);
+        const fraction = raw
+          .slice(-decimals)
+          .replace(/0+$/, "");
+
+        formattedSupply = fraction
+          ? whole + "." + fraction
+          : whole;
+      }
+    }
+
+    result.innerHTML = "";
+
+    function show(label, value) {
+      const p = document.createElement("p");
+      const strong = document.createElement("strong");
+
+      strong.textContent = label + ": ";
+      p.appendChild(strong);
+      p.appendChild(
+        document.createTextNode(String(value))
+      );
+
+      result.appendChild(p);
+    }
+
+    const heading = document.createElement("h3");
+    heading.className = "success";
+    heading.textContent = "🦁 Token Research Results";
+    result.appendChild(heading);
+
+    show("Token Name", name);
+    show("Symbol", symbol);
+    show("Decimals",
+      decimals === null ? "Unavailable" : decimals
+    );
+    show("Total Supply", formattedSupply);
+    show("Contract Address", address);
+
+    const note = document.createElement("p");
+    note.textContent =
+      "⚠️ Token information is not a security audit. " +
+      "Always research contracts before interacting.";
+
+    result.appendChild(note);
+
+  } catch (error) {
+
+    result.textContent =
+      "❌ " + error.message;
+
+    result.className = "error";
+
+  } finally {
+
+    button.disabled = false;
+
+  }
+}
+
+</script>
+
+</body>
+</html>
