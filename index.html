@@ -1,2 +1,48 @@
-<h1>TRON AI Token Scanner</h1>
-<p>Welcome to my AI tool!</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRON Token Scanner</title>
+<style>
+body{background:#0b1020;color:white;font-family:Arial,sans-serif;text-align:center;padding:30px 15px}
+main{background:#18223a;border-radius:16px;padding:25px;max-width:450px;margin:40px auto}
+h1{color:#25e6b8}
+input,button{box-sizing:border-box;width:100%;padding:15px;margin-top:15px;border-radius:9px;font-size:16px}
+input{background:#0b1020;color:white;border:1px solid #25e6b8}
+button{background:#25e6b8;border:0;font-weight:bold}
+#result{margin-top:20px;overflow-wrap:anywhere}
+a{color:#25e6b8}
+small{color:#aab5c8}
+</style>
+</head>
+<body>
+<main>
+<h1>🛡️ TRON Token Scanner</h1>
+<p>Enter a TRON address to research it</p>
+<input id="address" placeholder="TRON address">
+<button onclick="scan()">Scan Address</button>
+<div id="result"></div>
+<p><small>Address lookup only. Not a security audit or AI analysis.</small></p>
+</main>
+<script>
+function scan(){
+const address=document.getElementById("address").value.trim();
+const result=document.getElementById("result");
+result.replaceChildren();
+if(!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)){
+result.textContent="Please enter a valid-looking TRON address.";
+return;
+}
+const p=document.createElement("p");
+p.textContent="Address format looks correct. This does not confirm token safety.";
+const link=document.createElement("a");
+link.href="https://tronscan.org/#/address/"+encodeURIComponent(address);
+link.target="_blank";
+link.rel="noopener noreferrer";
+link.textContent="View blockchain details on TRONSCAN";
+result.append(p,link);
+}
+</script>
+</body>
+</html>
